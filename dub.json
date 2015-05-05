@@ -1,0 +1,12 @@
+{
+	"name": "rethinkdb",
+	"description": "A minimal D application.",
+	"copyright": "Copyright © 2015, tymate",
+	"authors": ["tymate"],
+	"dependencies": {
+    "vibe-d": ">=0.7.23",
+    "dproto": ">=1.2.3"
+	},
+  "versions": ["VibeCustomMain"],
+  "stringImportPaths": ["proto"]
+}
