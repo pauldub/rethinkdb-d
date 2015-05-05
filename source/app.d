@@ -1,4 +1,6 @@
 import std.stdio;
+import std.conv;
+import std.bitmanip;
 import vibe.d;
 import dproto.dproto;
 
@@ -17,8 +19,7 @@ class Session {
 
   string hostname;
   ushort port;
-
-  this(string hostname, ushort port) {
+this(string hostname, ushort port) {
     this.state = State.CLOSED;
     this.hostname = hostname;
     this.port = port;
@@ -29,15 +30,36 @@ class Session {
     this.state = State.OPEN;
   }
 
-  int handshake() {
+	void close() {
+		this.conn.close();
+		this.state = State.CLOSED;
+	}
+
+  bool handshake() {
     if(this.state != State.OPEN) {
-      return 1;
+      return false;
     }
 
-    this.state = State.HANDSHAKE;
-    this.conn.write(VersionDummy.Version.V0_4);
+		auto protocolVersion = nativeToLittleEndian(VersionDummy.Version.V0_4);
+    this.conn.write(protocolVersion);
 
-    return 0;
+		// Authentication
+		this.conn.write(nativeToLittleEndian(0));
+
+		auto protocolType = nativeToLittleEndian(VersionDummy.Protocol.PROTOBUF);
+		this.conn.write(protocolType);
+
+		ubyte[8] buf;
+		this.conn.read(buf);
+
+		auto result = fromStringz(cast(char *)buf);
+		if(result != "SUCCESS") {
+			return false;
+		}
+
+    this.state = State.HANDSHAKE;
+
+    return true;
   }
 
   void query() {
@@ -48,7 +70,17 @@ class Session {
 void main()
 {
   auto sess = new Session("localhost", 28015);
+	scope(exit) sess.close();
+
   sess.open();
 
+	if(sess.handshake()) {
+		writeln("Handshake sucessful");
+	} else {
+		writeln("Handeshake failed");
+	}
+
 	writeln("Edit source/app.d to start your project.");
+
+	delete sess;
 }
