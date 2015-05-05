@@ -6,6 +6,10 @@ import dproto.dproto;
 
 mixin ProtocolBuffer!"ql2.proto";
 
+/*
+ * TODO(paul):
+ *  - Ensure vibe.d resources are correctly cleaned up.
+ */
 class Session {
   enum State {
     CLOSED,
@@ -19,29 +23,30 @@ class Session {
 
   string hostname;
   ushort port;
-this(string hostname, ushort port) {
-    this.state = State.CLOSED;
-    this.hostname = hostname;
-    this.port = port;
-  }
 
-  void open() {
-    this.conn = connectTCP(hostname, port);
-    this.state = State.OPEN;
-  }
+	this(string hostname, ushort port) {
+		this.state = State.CLOSED;
+		this.hostname = hostname;
+		this.port = port;
+	}
+
+	void open() {
+		this.conn = connectTCP(hostname, port);
+		this.state = State.OPEN;
+	}
 
 	void close() {
 		this.conn.close();
 		this.state = State.CLOSED;
 	}
 
-  bool handshake() {
-    if(this.state != State.OPEN) {
-      return false;
-    }
+	bool handshake() {
+		if(this.state != State.OPEN) {
+			return false;
+		}
 
 		auto protocolVersion = nativeToLittleEndian(VersionDummy.Version.V0_4);
-    this.conn.write(protocolVersion);
+		this.conn.write(protocolVersion);
 
 		// Authentication
 		this.conn.write(nativeToLittleEndian(0));
@@ -57,22 +62,22 @@ this(string hostname, ushort port) {
 			return false;
 		}
 
-    this.state = State.HANDSHAKE;
+		this.state = State.HANDSHAKE;
 
-    return true;
-  }
+		return true;
+	}
 
-  void query() {
-    return;
-  }
+	void query() {
+		return;
+	}
 }
 
 void main()
 {
-  auto sess = new Session("localhost", 28015);
+	auto sess = new Session("localhost", 28015);
 	scope(exit) sess.close();
 
-  sess.open();
+	sess.open();
 
 	if(sess.handshake()) {
 		writeln("Handshake sucessful");
