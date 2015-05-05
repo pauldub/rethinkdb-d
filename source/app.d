@@ -1,6 +1,8 @@
 import std.stdio;
 import std.conv;
 import std.bitmanip;
+import std.encoding;
+import std.json;
 import vibe.d;
 import dproto.dproto;
 
@@ -19,6 +21,7 @@ class Session {
 
   State state;
 
+  long queryToken; 
   TCPConnection conn;
 
   string hostname;
@@ -51,7 +54,8 @@ class Session {
 		// Authentication
 		this.conn.write(nativeToLittleEndian(0));
 
-		auto protocolType = nativeToLittleEndian(VersionDummy.Protocol.PROTOBUF);
+    // TODO(paul): Support protobuf protocol.
+		auto protocolType = nativeToLittleEndian(VersionDummy.Protocol.JSON);
 		this.conn.write(protocolType);
 
 		ubyte[8] buf;
@@ -68,6 +72,42 @@ class Session {
 	}
 
 	void query() {
+    if(this.state != State.HANDSHAKE) {
+      throw new Exception("Session state is not HANDSHAKE");
+    }
+
+    JSONValue jj = ["foo": "bar"];
+    AsciiString as;
+    auto query = jj.toString();
+    auto token = this.queryToken++;
+
+    query.transcode(as);
+
+    writefln("query: %s token: %d len: %d", query, token, as.length);
+
+    this.conn.write(nativeToLittleEndian(token));
+    this.conn.write(nativeToLittleEndian(query.length));
+    this.conn.write(query);
+
+    // Read response query token
+    ubyte[8] tokenBuf;
+    this.conn.read(tokenBuf);
+    auto resToken = littleEndianToNative!long(tokenBuf);
+
+    // Read response len
+    ubyte[4] lenBuf;
+    this.conn.read(lenBuf);
+    auto resLen = littleEndianToNative!int(lenBuf);
+
+    // Read response content
+    ubyte[] resBuf;
+    resBuf.length = resLen;
+    this.conn.read(resBuf);
+
+    writefln("token: %d len: %d res: %s", resToken, resLen,
+        fromStringz(cast(char *)resBuf));
+
+
 		return;
 	}
 }
@@ -81,6 +121,8 @@ void main()
 
 	if(sess.handshake()) {
 		writeln("Handshake sucessful");
+
+    sess.query();
 	} else {
 		writeln("Handeshake failed");
 	}
