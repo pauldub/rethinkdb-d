@@ -17,39 +17,63 @@ mixin ProtocolBuffer!"ql2.proto";
    (Type, [Parent,] Args)
 
  */
-class RQL {
+class R {
+  static RQL!T db(T = string[])(string db) {
+    return new RQL!T(Term.TermType.DB, [db]);
+  }
+}
+
+// T = Type of arguments for this expression
+// P = Type of arguments for the parent expression
+class RQL(T, P = string[]) {
   Term.TermType command;
-  string[] arguments;
+  T arguments;
   int options;
-  RQL parent;
+  RQL!P parent;
 
   this(Term.TermType command) {
     this.command = command;
   }
 
-  this(Term.TermType command, string[] arguments) {
+  this(Term.TermType command, T arguments) {
     this.command = command;
     this.arguments = arguments;
   }
 
-  RQL table(string table) {
-    auto r = new RQL(Term.TermType.TABLE, [table]);
+  RQL!(U, T) table(U = string[])(string table) {
+    return chain!(U)(Term.TermType.TABLE, [table]);
+  }
+  
+  RQL!(U, T) filter(U = string[string])(U args) {
+    return chain!(U)(Term.TermType.FILTER, args);
+  } 
+
+  // U = Type of arguments for the chained expression
+  RQL!(U, T) chain(U)(Term.TermType type, U args) {
+    auto r = new RQL!(U, T)(type, args);
     r.parent = this;
     return r;
   }
 
-  static RQL db(string db) {
-    return new RQL(Term.TermType.DB, [db]);
+  // TODO: Clean this mess.
+  JSONValue parentJson(T : string[])() {
+    auto j = JSONValue([this.parent.json()]);
+    foreach(string arg; this.arguments) {
+      j.array ~= JSONValue(arg);
+    }
+    return j;
+  }
+
+  JSONValue parentJson(T : string[string])() {
+      auto j = JSONValue([this.parent.json()]);
+      j.array ~= JSONValue(this.arguments);
+      return j;
   }
 
   JSONValue json() {
     JSONValue j = [this.command];
     if(this.parent) {
-      auto arr = JSONValue([this.parent.json()]);
-      foreach(string arg; this.arguments) {
-        arr.array ~= JSONValue(arg);
-      }
-      j.array ~= arr;
+      j.array ~= parentJson!T();
     } else {
       j.array ~= JSONValue(this.arguments);
     }
@@ -57,6 +81,7 @@ class RQL {
     return j;
   }
 
+  /*
   Term term() {
     Term t;
     t.type = this.command;
@@ -69,9 +94,35 @@ class RQL {
 
     return t;
   }
+  */
 
-  void run(Session sess) {
-    sess.query(this);
+  RethinkResponse run(Session sess) {
+    return sess.query!(T, P)(this);
+  }
+}
+
+class RethinkResponse {
+  Response.ResponseType type;
+  JSONValue result;
+  Response.ResponseNote[] notes;
+
+  this(Response.ResponseType type, JSONValue result, Response.ResponseNote[] notes) {
+    this.type = type;
+    this.result = result;
+    this.notes = notes;
+  }
+
+  static RethinkResponse fromJSON(JSONValue j) {
+    auto type = cast(Response.ResponseType)j["t"].integer;
+    auto result = j["r"];
+    Response.ResponseNote[] notes;
+    notes.length = j["n"].array.length;
+
+    foreach(JSONValue jn; j["n"].array) {
+      notes ~= cast(Response.ResponseNote)jn.integer;
+    }
+
+    return new RethinkResponse(type, result, notes);
   }
 }
 
@@ -142,7 +193,7 @@ class Session {
     return true;
   }
 
-  void query(RQL term) {
+  RethinkResponse query(T, U)(RQL!(T, U) term) {
     if(this.state != State.HANDSHAKE) {
       throw new Exception("Session state is not HANDSHAKE");
     }
@@ -186,7 +237,7 @@ class Session {
     writefln("token: %d len: %d res: %s", resToken, resLen,
         fromStringz(cast(char *)resBuf));
 
-    return;
+    return RethinkResponse.fromJSON(parseJSON(resBuf));
   }
 }
 
@@ -199,7 +250,7 @@ void main()
   if(sess.handshake()) {
     writeln("Handshake sucessful");
 
-    RQL.db("foobar").table("qux").run(sess);
+    R.db("blog").table("users").filter(["name": "Michel"]).run(sess);
   } else {
     writeln("Handeshake failed");
   }
