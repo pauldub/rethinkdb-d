@@ -10,7 +10,12 @@ import dproto.dproto;
 mixin ProtocolBuffer!"ql2.proto";
 
 /*
-   (Type, [Next,] Args)
+   TODO(paul): Specify query encoding correctly.
+
+   RQL encodes into a list:
+
+   (Type, [Parent,] Args)
+
  */
 class RQL {
   Term.TermType command;
@@ -81,55 +86,55 @@ class Session {
   string hostname;
   ushort port;
 
-	this(string hostname, ushort port) {
-		this.state = State.CLOSED;
-		this.hostname = hostname;
-		this.port = port;
-	}
+  this(string hostname, ushort port) {
+    this.state = State.CLOSED;
+    this.hostname = hostname;
+    this.port = port;
+  }
 
-	void open() {
-		this.conn = connectTCP(hostname, port);
-		this.state = State.OPEN;
-	}
+  void open() {
+    this.conn = connectTCP(hostname, port);
+    this.state = State.OPEN;
+  }
 
-	void close() {
+  void close() {
     if(this.conn.connected) {
       this.conn.close();
     }
 
-		this.state = State.CLOSED;
-	}
+    this.state = State.CLOSED;
+  }
 
-	bool handshake() {
-		if(this.state != State.OPEN) {
-			return false;
-		}
+  bool handshake() {
+    if(this.state != State.OPEN) {
+      return false;
+    }
 
-		auto protocolVersion = nativeToLittleEndian(VersionDummy.Version.V0_4);
-		this.conn.write(protocolVersion);
+    auto protocolVersion = nativeToLittleEndian(VersionDummy.Version.V0_4);
+    this.conn.write(protocolVersion);
 
-		// Authentication
-		this.conn.write(nativeToLittleEndian(0));
+    // Authentication
+    this.conn.write(nativeToLittleEndian(0));
 
     // TODO(paul): Support protobuf protocol.
-		// auto protocolType = nativeToLittleEndian(VersionDummy.Protocol.PROTOBUF);
-		auto protocolType = nativeToLittleEndian(VersionDummy.Protocol.JSON);
-		this.conn.write(protocolType);
+    // auto protocolType = nativeToLittleEndian(VersionDummy.Protocol.PROTOBUF);
+    auto protocolType = nativeToLittleEndian(VersionDummy.Protocol.JSON);
+    this.conn.write(protocolType);
 
-		ubyte[8] buf;
-		this.conn.read(buf);
+    ubyte[8] buf;
+    this.conn.read(buf);
 
-		auto result = fromStringz(cast(char *)buf);
-		if(result != "SUCCESS") {
-			return false;
-		}
+    auto result = fromStringz(cast(char *)buf);
+    if(result != "SUCCESS") {
+      return false;
+    }
 
-		this.state = State.HANDSHAKE;
+    this.state = State.HANDSHAKE;
 
-		return true;
-	}
+    return true;
+  }
 
-	void query() {
+  void query() {
     if(this.state != State.HANDSHAKE) {
       throw new Exception("Session state is not HANDSHAKE");
     }
@@ -174,27 +179,27 @@ class Session {
     writefln("token: %d len: %d res: %s", resToken, resLen,
         fromStringz(cast(char *)resBuf));
 
-		return;
-	}
+    return;
+  }
 }
 
 void main()
 {
-	auto sess = new Session("localhost", 28015);
+  auto sess = new Session("localhost", 28015);
 
-	sess.open();
+  sess.open();
 
-	if(sess.handshake()) {
-		writeln("Handshake sucessful");
+  if(sess.handshake()) {
+    writeln("Handshake sucessful");
 
     sess.query();
-	} else {
-		writeln("Handeshake failed");
-	}
+  } else {
+    writeln("Handeshake failed");
+  }
 
   // R.db("foo").table("bar").run(sess);
 
-	sess.close();
+  sess.close();
 
-	writeln("Edit source/app.d to start your project.");
+  writeln("Edit source/app.d to start your project.");
 }
