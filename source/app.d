@@ -45,7 +45,11 @@ class RQL {
   JSONValue json() {
     JSONValue j = [this.command];
     if(this.parent) {
-      j.array ~= [this.parent.json(), JSONValue(this.arguments)];
+      auto arr = JSONValue([this.parent.json()]);
+      foreach(string arg; this.arguments) {
+        arr.array ~= JSONValue(arg);
+      }
+      j.array ~= arr;
     } else {
       j.array ~= JSONValue(this.arguments);
     }
@@ -64,6 +68,10 @@ class RQL {
     t.datum = d;
 
     return t;
+  }
+
+  void run(Session sess) {
+    sess.query(this);
   }
 }
 
@@ -134,16 +142,15 @@ class Session {
     return true;
   }
 
-  void query() {
+  void query(RQL term) {
     if(this.state != State.HANDSHAKE) {
       throw new Exception("Session state is not HANDSHAKE");
     }
 
-    auto term = RQL.db("foobar").table("qux").json();
     auto token = ++this.queryToken;
 
     JSONValue q = [Query.QueryType.START];
-    q.array ~= term;
+    q.array ~= term.json();
     q.array ~= parseJSON("{}");
 
     auto query = q.toString();
@@ -192,12 +199,10 @@ void main()
   if(sess.handshake()) {
     writeln("Handshake sucessful");
 
-    sess.query();
+    RQL.db("foobar").table("qux").run(sess);
   } else {
     writeln("Handeshake failed");
   }
-
-  // R.db("foo").table("bar").run(sess);
 
   sess.close();
 
