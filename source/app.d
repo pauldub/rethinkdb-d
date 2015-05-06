@@ -3,10 +3,54 @@ import std.conv;
 import std.bitmanip;
 import std.encoding;
 import std.json;
+import std.uni;
 import vibe.d;
 import dproto.dproto;
 
 mixin ProtocolBuffer!"ql2.proto";
+
+class RQL {
+  Term.TermType command;
+  string[] arguments;
+  int options;
+
+  this(Term.TermType command) {
+    this.command = command;
+  }
+
+  this(Term.TermType command, string[] arguments) {
+    this.command = command;
+    this.arguments = arguments;
+  }
+
+  RQL table(string table) {
+    return new RQL(Term.TermType.TABLE, [table]);
+  }
+
+  RQL db(string db) {
+    return new RQL(Term.TermType.DB, [db]);
+  }
+
+  JSONValue json() {
+    JSONValue j = [this.command];
+    j.array ~= JSONValue(this.arguments);
+
+    return j;
+  }
+
+  Term term() {
+    Term t;
+    t.type = this.command;
+
+    Datum d;
+    d.type = Datum.DatumType.R_STR;
+    d.r_str = this.arguments[0];
+
+    t.datum = d;
+
+    return t;
+  }
+}
 
 /*
  * TODO(paul):
@@ -39,7 +83,10 @@ class Session {
 	}
 
 	void close() {
-		this.conn.close();
+    if(this.conn.connected) {
+      this.conn.close();
+    }
+
 		this.state = State.CLOSED;
 	}
 
@@ -55,6 +102,7 @@ class Session {
 		this.conn.write(nativeToLittleEndian(0));
 
     // TODO(paul): Support protobuf protocol.
+		// auto protocolType = nativeToLittleEndian(VersionDummy.Protocol.PROTOBUF);
 		auto protocolType = nativeToLittleEndian(VersionDummy.Protocol.JSON);
 		this.conn.write(protocolType);
 
@@ -76,17 +124,28 @@ class Session {
       throw new Exception("Session state is not HANDSHAKE");
     }
 
-    JSONValue jj = ["foo": "bar"];
-    AsciiString as;
-    auto query = jj.toString();
-    auto token = this.queryToken++;
+    RQL db = new RQL(Term.TermType.DB, ["foo"]);
 
-    query.transcode(as);
+    auto term = db.json();
+    auto token = ++this.queryToken;
 
-    writefln("query: %s token: %d len: %d", query, token, as.length);
+    JSONValue q = [Query.QueryType.START];
+    q.array ~= term;
+    q.array ~= parseJSON("{}");
+
+    auto query = q.toString();
+
+    long len(T)(T[] str) {
+      return str.length * T.sizeof;
+    }
+
+    writefln("query: %s token: %d len: %d %d", query, token, query.length, len(query));
+    writefln("%(%02x %)", nativeToLittleEndian(token));
+    writefln("%(%02x %)", nativeToLittleEndian(cast(int)len(query)));
+    writefln("%(%02x %)", cast(ubyte[])query);
 
     this.conn.write(nativeToLittleEndian(token));
-    this.conn.write(nativeToLittleEndian(query.length));
+    this.conn.write(nativeToLittleEndian(cast(int)len(query)));
     this.conn.write(query);
 
     // Read response query token
@@ -107,7 +166,6 @@ class Session {
     writefln("token: %d len: %d res: %s", resToken, resLen,
         fromStringz(cast(char *)resBuf));
 
-
 		return;
 	}
 }
@@ -115,7 +173,6 @@ class Session {
 void main()
 {
 	auto sess = new Session("localhost", 28015);
-	scope(exit) sess.close();
 
 	sess.open();
 
@@ -126,6 +183,8 @@ void main()
 	} else {
 		writeln("Handeshake failed");
 	}
+
+	sess.close();
 
 	writeln("Edit source/app.d to start your project.");
 }
