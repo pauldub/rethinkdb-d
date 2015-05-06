@@ -9,10 +9,14 @@ import dproto.dproto;
 
 mixin ProtocolBuffer!"ql2.proto";
 
+/*
+   (Type, [Next,] Args)
+ */
 class RQL {
   Term.TermType command;
   string[] arguments;
   int options;
+  RQL parent;
 
   this(Term.TermType command) {
     this.command = command;
@@ -24,16 +28,22 @@ class RQL {
   }
 
   RQL table(string table) {
-    return new RQL(Term.TermType.TABLE, [table]);
+    auto r = new RQL(Term.TermType.TABLE, [table]);
+    r.parent = this;
+    return r;
   }
 
-  RQL db(string db) {
+  static RQL db(string db) {
     return new RQL(Term.TermType.DB, [db]);
   }
 
   JSONValue json() {
     JSONValue j = [this.command];
-    j.array ~= JSONValue(this.arguments);
+    if(this.parent) {
+      j.array ~= [this.parent.json(), JSONValue(this.arguments)];
+    } else {
+      j.array ~= JSONValue(this.arguments);
+    }
 
     return j;
   }
@@ -124,9 +134,7 @@ class Session {
       throw new Exception("Session state is not HANDSHAKE");
     }
 
-    RQL db = new RQL(Term.TermType.DB, ["foo"]);
-
-    auto term = db.json();
+    auto term = RQL.db("foobar").table("qux").json();
     auto token = ++this.queryToken;
 
     JSONValue q = [Query.QueryType.START];
@@ -183,6 +191,8 @@ void main()
 	} else {
 		writeln("Handeshake failed");
 	}
+
+  // R.db("foo").table("bar").run(sess);
 
 	sess.close();
 
