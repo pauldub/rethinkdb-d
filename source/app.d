@@ -17,12 +17,7 @@ alias VersionDummy.Protocol Protocol;
 alias Query.QueryType QueryType;
 
 /*
-   TODO(paul): Specify query encoding correctly.
-
-   RQL encodes into a list:
-
-   (Type, [Parent,] Args)
-
+ 	TODO(paul): Use proper names for each class.
  */
 class R {
   static RQL!T db(T = string[])(string db) {
