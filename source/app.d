@@ -9,6 +9,13 @@ import dproto.dproto;
 
 mixin ProtocolBuffer!"ql2.proto";
 
+alias Term.TermType TermType;
+alias Response.ResponseType ResponseType;
+alias Response.ResponseNote ResponseNote;
+alias VersionDummy.Version Version;
+alias VersionDummy.Protocol Protocol;
+alias Query.QueryType QueryType;
+
 /*
    TODO(paul): Specify query encoding correctly.
 
@@ -19,37 +26,37 @@ mixin ProtocolBuffer!"ql2.proto";
  */
 class R {
   static RQL!T db(T = string[])(string db) {
-    return new RQL!T(Term.TermType.DB, [db]);
+    return new RQL!T(TermType.DB, [db]);
   }
 }
 
 // T = Type of arguments for this expression
 // P = Type of arguments for the parent expression
 class RQL(T, P = string[]) {
-  Term.TermType command;
+  TermType command;
   T arguments;
   int options;
   RQL!P parent;
 
-  this(Term.TermType command) {
+  this(TermType command) {
     this.command = command;
   }
 
-  this(Term.TermType command, T arguments) {
+  this(TermType command, T arguments) {
     this.command = command;
     this.arguments = arguments;
   }
 
   RQL!(U, T) table(U = string[])(string table) {
-    return chain!(U)(Term.TermType.TABLE, [table]);
+    return chain!(U)(TermType.TABLE, [table]);
   }
   
   RQL!(U, T) filter(U = string[string])(U args) {
-    return chain!(U)(Term.TermType.FILTER, args);
+    return chain!(U)(TermType.FILTER, args);
   } 
 
   // U = Type of arguments for the chained expression
-  RQL!(U, T) chain(U)(Term.TermType type, U args) {
+  RQL!(U, T) chain(U)(TermType type, U args) {
     auto r = new RQL!(U, T)(type, args);
     r.parent = this;
     return r;
@@ -102,24 +109,24 @@ class RQL(T, P = string[]) {
 }
 
 class RethinkResponse {
-  Response.ResponseType type;
+  ResponseType type;
   JSONValue result;
-  Response.ResponseNote[] notes;
+  ResponseNote[] notes;
 
-  this(Response.ResponseType type, JSONValue result, Response.ResponseNote[] notes) {
+  this(ResponseType type, JSONValue result, ResponseNote[] notes) {
     this.type = type;
     this.result = result;
     this.notes = notes;
   }
 
   static RethinkResponse fromJSON(JSONValue j) {
-    auto type = cast(Response.ResponseType)j["t"].integer;
+    auto type = cast(ResponseType)j["t"].integer;
     auto result = j["r"];
     Response.ResponseNote[] notes;
     notes.length = j["n"].array.length;
 
     foreach(JSONValue jn; j["n"].array) {
-      notes ~= cast(Response.ResponseNote)jn.integer;
+      notes ~= cast(ResponseNote)jn.integer;
     }
 
     return new RethinkResponse(type, result, notes);
@@ -169,7 +176,7 @@ class Session {
       return false;
     }
 
-    auto protocolVersion = nativeToLittleEndian(VersionDummy.Version.V0_4);
+    auto protocolVersion = nativeToLittleEndian(Version.V0_4);
     this.conn.write(protocolVersion);
 
     // Authentication
@@ -177,7 +184,7 @@ class Session {
 
     // TODO(paul): Support protobuf protocol.
     // auto protocolType = nativeToLittleEndian(VersionDummy.Protocol.PROTOBUF);
-    auto protocolType = nativeToLittleEndian(VersionDummy.Protocol.JSON);
+    auto protocolType = nativeToLittleEndian(Protocol.JSON);
     this.conn.write(protocolType);
 
     ubyte[8] buf;
@@ -200,7 +207,7 @@ class Session {
 
     auto token = ++this.queryToken;
 
-    JSONValue q = [Query.QueryType.START];
+    JSONValue q = [QueryType.START];
     q.array ~= term.json();
     q.array ~= parseJSON("{}");
 
