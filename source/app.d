@@ -15,6 +15,7 @@ alias Response.ResponseNote ResponseNote;
 alias VersionDummy.Version Version;
 alias VersionDummy.Protocol Protocol;
 alias Query.QueryType QueryType;
+alias Datum.DatumType DatumType;
 
 /*
  	TODO(paul): Use proper names for each class.
@@ -83,20 +84,61 @@ class RQL(T, P = string[]) {
     return j;
   }
 
-  /*
-  Term term() {
+  Datum makeDatum(string s) {
+    Datum d;
+    d.type = DatumType.R_STR;
+    d.r_str = s;
+    return d;
+  }
+
+  Datum makeDatum(bool s) {
+    Datum d;
+    d.type = DatumType.R_BOOL;
+    d.r_bool = s;
+    return d;
+  }
+
+  Datum makeDatum(double s) {
+    Datum d;
+    d.type = DatumType.R_NUM;
+    d.r_num = s;
+    return d;
+  }
+
+  Datum makeDatum(T)(string[T] s) {
+    Datum d;
+    d.type = DatumType.R_OBJ;
+    foreach(string k, T v; s) {
+      Datum.AssocPair pair;
+      pair.key = k;
+      pair.val = datum(v);
+
+      d.r_obj ~= pair;
+    }
+  }
+
+  Datum datum(T)(T s) {
+    return makeDatum(s);
+  }
+
+  Term term(T : T[])() {
     Term t;
     t.type = this.command;
 
-    Datum d;
-    d.type = Datum.DatumType.R_STR;
-    d.r_str = this.arguments[0];
+    if(this.parent) {
+      t.args ~= this.parent.term();
+    }
 
-    t.datum = d;
+    foreach(T a; this.arguments) {
+      Term arg;
+      arg.type = TermType.DATUM;
+      arg.datum = datum(a);
+
+      t.args ~= arg;
+    }
 
     return t;
   }
-  */
 
   RethinkResponse run(Session sess) {
     return sess.query!(T, P)(this);
