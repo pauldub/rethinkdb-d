@@ -95,14 +95,16 @@ class RQL(T, P = string[]) {
 
   Datum makeDatum(T)(string[T] s) {
     Datum d;
-    d.type = DatumType.R_OBJ;
+    d.type = DatumType.R_OBJECT;
     foreach(string k, T v; s) {
       Datum.AssocPair pair;
       pair.key = k;
       pair.val = datum(v);
 
-      d.r_obj ~= pair;
+      d.r_object ~= pair;
     }
+
+		return d;
   }
 
   Datum datum(T)(T s) {
@@ -114,7 +116,7 @@ class RQL(T, P = string[]) {
     t.type = this.command;
 
     if(this.parent) {
-      t.args ~= this.parent.term();
+      t.args ~= this.parent.term!P();
     }
 
     foreach(T a; this.arguments) {
@@ -124,6 +126,22 @@ class RQL(T, P = string[]) {
 
       t.args ~= arg;
     }
+
+    return t;
+  }
+
+  Term term(T : T)() {
+    Term t;
+    t.type = this.command;
+
+    if(this.parent) {
+      t.args ~= this.parent.term!P();
+    }
+
+		Term args;
+		args.type = TermType.DATUM;
+		args.datum = datum(this.arguments);
+		t.args ~= args;
 
     return t;
   }

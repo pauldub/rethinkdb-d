@@ -4,9 +4,14 @@ import std.json;
 import proto = rethinkdb.protocol;
 
 class Response {
+	long token;
   proto.ResponseType type;
   JSONValue result;
   proto.ResponseNote[] notes;
+	proto.Datum[] data;
+
+	this() {
+	}
 
   this(proto.ResponseType type, JSONValue result, proto.ResponseNote[] notes) {
     this.type = type;

@@ -16,6 +16,7 @@ alias Proto.Response.ResponseNote ResponseNote;
 alias Proto.VersionDummy.Version Version;
 alias Proto.VersionDummy.Protocol Protocol;
 
+alias Proto.Query Query;
 alias Proto.Query.QueryType QueryType;
 
 alias Proto.Datum Datum;

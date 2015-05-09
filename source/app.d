@@ -5,6 +5,7 @@ import rethinkdb;
 void main()
 {
   auto sess = new Session("localhost", 28015);
+	sess.protocol = Protocol.PROTOBUF;
 
   sess.open();
 
