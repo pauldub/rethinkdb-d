@@ -8,7 +8,7 @@ class Response {
   proto.ResponseType type;
   JSONValue result;
   proto.ResponseNote[] notes;
-	proto.Datum[] data;
+	// proto.Datum[] data;
 
 	this() {
 	}

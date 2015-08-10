@@ -51,8 +51,7 @@ class Session {
   }
 
   bool handshake() {
-    if(this.state != State.OPEN) {
-      return false;
+    if(this.state != State.OPEN) { return false;
     }
 
     auto protocolVersion = nativeToLittleEndian(proto.Version.V0_4);
@@ -126,6 +125,9 @@ class Session {
 		q.query = rql.term!T();
 		q.token = token;
 
+    long len(T)(T[] str) {
+      return str.length * T.sizeof;
+    }
 		auto query = q.serialize();
     writefln("query: %s token: %d len: %d", query, token, query.length);
 
@@ -133,6 +135,7 @@ class Session {
     writefln("%(%02x %)", nativeToLittleEndian(query.length));
     writefln("%(%02x %)", query);
 
+    // this.conn.write(nativeToLittleEndian(token));
 		this.conn.write(nativeToLittleEndian(query.length));
 		this.conn.write(query);
 
